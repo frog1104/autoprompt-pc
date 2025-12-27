@@ -2,84 +2,72 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# --- CONFIG ---
-st.set_page_config(page_title="Auto Prompter - Final", page_icon="✨")
-st.title("✨ Auto Prompter: Universal")
-st.markdown("Upload gambar (Baju/Tudung/Kasut), dapatkan 8 Magic Prompt siap copy.")
+st.set_page_config(page_title="Auto Prompter - Hybrid", page_icon="🛡️")
+st.title("🛡️ Auto Prompter: Hybrid Mode")
+st.markdown("Kod ini akan cari sendiri model yang 'hidup' dalam akaun anda.")
 
-# --- SIDEBAR: API KEY ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.header("🔐 Kunci")
-    # Tuan masukkan Key yang 'BERJAYA' tadi di sini nanti
     api_key = st.text_input("Masukkan API Key", type="password")
 
-# --- FUNGSI AI ---
+# --- FUNGSI PENTING: CARI MODEL YANG HIDUP ---
+def find_valid_model():
+    # Kita scan semua model dalam akaun
+    for m in genai.list_models():
+        # Kita nak model yang boleh 'generateContent' dan versi '1.5'
+        if 'generateContent' in m.supported_generation_methods:
+            if 'flash' in m.name or 'pro' in m.name:
+                return m.name # Jumpa! Pulangkan nama dia (contoh: models/gemini-1.5-flash-001)
+    return None
+
+# --- FUNGSI GENERATE ---
 def generate_prompts(image, api_key):
-    # Setup
     genai.configure(api_key=api_key)
     
-    # Kita guna model Flash (Laju)
-    # Kalau flash tak jalan, kod ni automatik cari model lain (Safety net)
-    target_model = 'gemini-1.5-flash'
-    try:
-        model = genai.GenerativeModel(target_model)
-    except:
-        model = genai.GenerativeModel('gemini-pro')
-
-    # PROMPT "VISUAL DNA" (YANG TUAN BUAT)
-    system_prompt = """
-    Act as a professional fashion photographer and expert AI Prompt Engineer.
-    Task: Perform a detailed visual analysis of the product in the uploaded image to extract its 'Visual DNA'. Focus ONLY on the item (Garment/Hijab/Shoes/Bag).
+    # 1. Cari Model Dulu
+    valid_model_name = find_valid_model()
     
-    Analyze: Type, Fabric & Texture, Color, Cut & Fit, Details.
-
-    CRITICAL STEP:
-    Based on the analysis, create 8 DISTINCT AI IMAGE PROMPTS for Midjourney/Flux.
-    Styles:
-    1. Lookbook Studio (Clean grey/white background, professional lighting)
-    2. Cinematic Outdoor (Natural lighting, depth of field, realistic)
-    3. Luxury Editorial (High fashion magazine style, dramatic)
-    4. Traditional/Cultural Vibes (Kampung or heritage setting, warm tones)
-    5. Close-Up Detail (Focus on fabric texture)
-    6. Minimalist E-Commerce (Pure white background)
-    7. Soft Pastel/Dreamy (Soft focus, airy)
-    8. Street Style/Urban (Modern city background)
-
-    OUTPUT FORMAT:
-    Strictly output ONLY the list of 8 prompts. Do not write any intro.
+    if not valid_model_name:
+        return "ERROR: Tak jumpa model Gemini 1.5 dalam akaun ini."
+    
+    # 2. Guna Model Yang Dijumpai
+    model = genai.GenerativeModel(valid_model_name)
+    
+    # 3. Prompt Visual DNA
+    system_prompt = """
+    Act as a fashion expert. Analyze the uploaded image (Garment/Hijab/Accessory).
+    Create 8 DISTINCT AI PROMPTS for Midjourney/Flux based on the visual DNA.
+    Styles: Lookbook, Cinematic, Luxury, Cultural, Detail, Minimalist, Dreamy, Urban.
+    Output ONLY the list of 8 prompts.
     """
     
     response = model.generate_content([system_prompt, image])
-    return response.text
+    return response.text, valid_model_name
 
-# --- UI (PAPARAN) ---
-uploaded_file = st.file_uploader("Upload Gambar Produk", type=["jpg", "png", "jpeg", "webp"])
+# --- UI ---
+uploaded_file = st.file_uploader("Upload Gambar", type=["jpg", "png", "jpeg", "webp"])
 
-if uploaded_file is not None:
-    # 1. Tunjuk Gambar Dulu
-    image = Image.open(uploaded_file)
-    st.image(image, caption="Gambar Produk", width=300)
-    
-    # 2. Butang Jana
-    if st.button("Jana Magic Prompt 🚀", type="primary"):
-        if not api_key:
-            st.error("Masukkan API Key kat tepi (Sidebar) dulu bos.")
-        else:
-            try:
-                with st.spinner("Sedang analisis Visual DNA..."):
-                    result_text = generate_prompts(image, api_key)
+if uploaded_file and st.button("Jana Prompt 🚀", type="primary"):
+    if not api_key:
+        st.error("Masukkan Key dulu.")
+    else:
+        try:
+            image = Image.open(uploaded_file)
+            st.image(image, width=250)
+            
+            with st.spinner("Sedang mencari model & analisis gambar..."):
+                # Panggil fungsi generate
+                result = generate_prompts(image, api_key)
+                
+                # Check kalau result tu Error
+                if isinstance(result, str) and "ERROR" in result:
+                     st.error(result)
+                else:
+                    text_output, model_used = result
+                    st.success(f"Berjaya! (Guna model: {model_used})")
+                    st.code(text_output)
                     
-                    st.success("Siap! Pilih style di bawah:")
-                    st.markdown("---")
-                    
-                    # Bersihkan & Paparkan Output
-                    lines = result_text.split('\n')
-                    for line in lines:
-                        if line.strip():
-                            # Buang nombor (1. , 2.) supaya bersih
-                            clean_line = line.lstrip('0123456789.-* ')
-                            st.code(clean_line, language="text")
-                            
-            except Exception as e:
-                st.error(f"Error: {e}")
-                st.info("Tips: Pastikan guna API Key yang 'BERJAYA' tadi.")
+        except Exception as e:
+            # INI AKAN BAGITAHU KITA APA ERROR SEBENAR
+            st.error(f"Error Terperinci: {e}")
