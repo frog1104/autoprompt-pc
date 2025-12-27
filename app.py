@@ -2,9 +2,9 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-st.set_page_config(page_title="Auto Prompter - Easy Copy", page_icon="✂️")
-st.title("✂️ Auto Prompter: Easy Copy Mode")
-st.markdown("Setiap prompt kini ada butang copy sendiri.")
+st.set_page_config(page_title="Auto Prompter - Pro", page_icon="✨")
+st.title("✨ Auto Prompter: Pro Version")
+st.markdown("Setiap prompt dilabel ikut Style masing-masing.")
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -25,11 +25,11 @@ def generate_prompts(image, api_key):
     valid_model_name = find_valid_model()
     
     if not valid_model_name:
-        return ["ERROR: Tak jumpa model."], "None"
+        return "ERROR_MODEL", "None"
     
     model = genai.GenerativeModel(valid_model_name)
     
-    # Kita minta AI bagi output yang bersih
+    # KITA PAKSA AI GUNA FORMAT "STYLE: PROMPT"
     system_prompt = """
     Act as a fashion expert. Analyze the uploaded image.
     Create 8 DISTINCT AI PROMPTS for Midjourney/Flux.
@@ -45,9 +45,12 @@ def generate_prompts(image, api_key):
     8. Street Style/Urban
 
     IMPORTANT OUTPUT FORMAT:
-    Just list the prompts. One prompt per line. 
-    Do not put empty lines between prompts.
-    Do not write intro text like "Here are the prompts".
+    You must use this exact format for every line:
+    Style Name: The prompt text here.
+
+    Example:
+    Lookbook Studio: A professional studio shot of a red dress...
+    Cinematic Outdoor: A realistic outdoor photo of...
     """
     
     response = model.generate_content([system_prompt, image])
@@ -64,35 +67,34 @@ if uploaded_file and st.button("Jana Prompt 🚀", type="primary"):
             image = Image.open(uploaded_file)
             st.image(image, width=200)
             
-            with st.spinner("Sedang memproses..."):
+            with st.spinner("Sedang menulis prompt..."):
                 text_output, model_used = generate_prompts(image, api_key)
                 
-                # Check error
-                if "ERROR" in text_output[0]:
-                    st.error("Ada masalah model.")
+                if text_output == "ERROR_MODEL":
+                    st.error("Tak jumpa model AI yang sesuai.")
                 else:
                     st.success(f"Siap! (Model: {model_used})")
-                    st.write("Tekan ikon 📄 kecil di bucu kanan kotak untuk copy.")
                     st.markdown("---")
                     
-                    # --- INI BAHAGIAN PECAHKAN PROMPT ---
-                    # Kita pisahkan ayat berdasarkan baris baru (Enter)
+                    # LOGIK PISAHKAN STYLE & PROMPT
                     prompts = text_output.split('\n')
                     
-                    count = 1
                     for p in prompts:
-                        # Abaikan baris kosong
                         if p.strip():
-                            # Buang nombor (1. , 2.) di depan ayat supaya bersih
-                            clean_p = p.lstrip("0123456789.-* ")
+                            # Kita cari simbol ":" untuk pisahkan Tajuk dan Isi
+                            if ":" in p:
+                                parts = p.split(":", 1) # Pisah dua
+                                style_name = parts[0].strip().lstrip("0123456789.-* ") # Bersihkan nombor
+                                prompt_content = parts[1].strip()
+                                
+                                # Paparkan Tajuk (Style)
+                                st.subheader(f"🎨 {style_name}")
+                                # Paparkan Kotak Copy (Isi sahaja)
+                                st.code(prompt_content, language="text")
                             
-                            # Buat Label Cantik
-                            st.caption(f"🎨 Style {count}")
-                            
-                            # KOTAK KHAS DENGAN BUTANG COPY
-                            st.code(clean_p, language="text")
-                            
-                            count += 1
+                            else:
+                                # Kalau AI tak letak ":", kita paparkan je semua
+                                st.code(p, language="text")
                             
         except Exception as e:
             st.error(f"Error: {e}")
