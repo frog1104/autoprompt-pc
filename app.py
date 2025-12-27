@@ -1,36 +1,30 @@
 import streamlit as st
 import google.generativeai as genai
-from PIL import Image
 
-st.set_page_config(page_title="Auto Prompter Final", page_icon="🚀")
-st.title("🚀 Auto Prompter: Final Version")
+st.title("🕵️ Penyiasat Model")
 
-# Input Key
-api_key = st.text_input("Masukkan API Key BARU (Dari Project Baru)", type="password")
+# Masukkan Key Baru Tuan Di Sini
+api_key = st.text_input("Masukkan Key BARU tadi", type="password")
 
-uploaded_file = st.file_uploader("Upload Gambar", type=["jpg", "png", "jpeg"])
-
-if uploaded_file and st.button("Jana Prompt"):
+if st.button("Check Suis"):
     if not api_key:
-        st.error("Masukkan Key dulu.")
+        st.error("Mana kuncinya?")
     else:
         try:
-            st.info("Menghubungi AI...")
             genai.configure(api_key=api_key)
             
-            # KITA GUNA MODEL 'GEMINI-PRO' BIASA (Paling Stabil)
-            # Kalau Flash tak jalan, model ni selalunya jalan.
-            model = genai.GenerativeModel("gemini-1.5-flash") 
+            # Kita senaraikan apa model yang hidup
+            models = []
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods:
+                    models.append(m.name)
             
-            prompt = "Analyze this image and generate 8 AI Art prompts (Studio, Outdoor, Luxury, etc). List only."
-            
-            image = Image.open(uploaded_file)
-            st.image(image, width=200)
-            
-            response = model.generate_content([prompt, image])
-            st.success("Berjaya!")
-            st.code(response.text)
-            
+            if len(models) > 0:
+                st.success(f"✅ BERJAYA! Suis Hidup! Ada {len(models)} model.")
+                st.write(models)
+                st.info("Sekarang baru kita boleh pasang kod apps sebenar!")
+            else:
+                st.error("❌ Alamak, senarai model KOSONG. Project ni pun tak ada suis.")
+                
         except Exception as e:
-            st.error(f"Error: {e}")
-            st.warning("Kalau error 404: Maknanya Key tu dari Project yang salah. Sila Create New Project di aistudio.google.com")
+            st.error(f"Error Key: {e}")
